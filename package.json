@@ -1,0 +1,11 @@
+{
+  "name": "drowsiness-detector-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test core.test.mjs app.test.mjs"
+  },
+  "devDependencies": { "jsdom": "25.0.1", "vite": "8.3.0" }
+}

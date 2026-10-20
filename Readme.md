@@ -1,106 +1,61 @@
-# Drowsiness Detection System
+# Drowsiness Detector — portfolio demo
 
-Real-time computer vision project that monitors eye aspect ratio (EAR) from webcam input and triggers an alert when sustained eye closure indicates potential driver fatigue.
+A refined, cross-platform educational adaptation of [P SREESANKAR's MIT MediaPipe example](https://github.com/p-sreesankar/drowsiness-detection). This new demo is separate from the original ISPO 2023 Android application. See [SOURCES.md](SOURCES.md) for attribution and changes.
 
-## Problem Statement
+## Try in a browser
 
-Driver drowsiness is a major safety risk, especially during long-distance travel and night driving. Manual monitoring is unreliable, and many low-cost setups lack real-time feedback.
+https://reiandraa.com/projects/drowsiness-detector/demo/
 
-## Solution
+Choose **Try without a camera** for a clearly labelled synthetic walkthrough. Choose **Start camera** on a Mac, PC or phone with a camera. Frames are processed on that device; they are not recorded or uploaded. Model downloads require an internet connection. **Stop**, leaving the page, or hiding the tab releases the camera.
 
-This project performs live face-landmark inference using MediaPipe, computes EAR per frame, applies threshold-based decision logic, and raises an audible warning when drowsiness persists across consecutive frames.
+This is a fixed-threshold eye-closure demonstration, not a clinical fatigue measurement or a driving safety system. Use while stationary. Lighting, eye shape, head angle, glasses, and hardware can affect it. A long closure is an observed signal, not proof that someone is asleep.
 
-## Key Features
+## Run Python on your Mac
 
-- Real-time webcam pipeline for continuous fatigue monitoring.
-- Face landmark inference with EAR-based eye-state estimation.
-- Consecutive-frame logic to reduce false positives from normal blinking.
-- Visual overlay showing current status and EAR value.
-- Modular structure with separate camera and detection components.
+Requires an Apple Silicon Mac with Python 3.10 or newer and a camera. From the downloaded/cloned project folder:
 
-## Tech Stack
-
-- Python
-- OpenCV
-- MediaPipe Tasks Vision (Face Landmarker)
-- NumPy
-- Windows audio alert via winsound
-
-Relevant ML and deployment keywords for recruiters and ATS:
-- Inference
-- Preprocessing
-- Real-time computer vision
-- Threshold-based classification
-- UI integration (live overlay)
-- TensorFlow and Keras extensibility path
-- MNIST-style benchmarking approach (future evaluation pattern)
-
-Note: TensorFlow, Keras, and MNIST are not currently used in runtime code; they are included here as part of a realistic extension and benchmarking direction.
-
-## Architecture / Workflow
-
-1. Capture frame from webcam.
-2. Preprocess frame (BGR to RGB conversion).
-3. Run asynchronous face-landmark inference.
-4. Compute left-eye and right-eye EAR.
-5. Average EAR and compare against drowsiness threshold.
-6. Count consecutive low-EAR frames.
-7. Trigger alert and show status overlay when threshold window is exceeded.
-
-## Setup and Quick Start
-
-### Prerequisites
-
-- Python 3.10 or newer
-- Webcam
-- Windows OS (current alert implementation uses winsound)
-
-### Installation
-
-```powershell
-git clone https://github.com/<your-username>/drowsiness-detection.git
-cd drowsiness-detection
-python -m venv .env
-.\.env\Scripts\Activate.ps1
-pip install -r requirements.txt
+```sh
+bash run-mac.sh
 ```
 
-### Run
+The first run creates a local `.venv`, installs the pinned packages, and downloads Google's verified model (about 4 MB). It uses no paid API. Allow Terminal to use the camera if macOS asks. Press **Q** or **Esc** to close the preview. Press **S** to toggle sound. No video file is written.
 
-```powershell
+For other platforms, or to install manually:
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 python main.py
 ```
 
-## Usage Steps
+Windows: activate with `.venv\Scripts\Activate.ps1` instead. Sound starts off; `python main.py --sound` enables it. Try `--camera 1` if the default camera is unavailable.
 
-1. Start the application with python main.py.
-2. Sit in front of the webcam with adequate lighting.
-3. Watch the live window for EAR and status labels.
-4. Simulate prolonged eye closure to verify alert behavior.
-5. Press q to exit safely.
+Check the real model without opening any camera:
 
-## Measurable Outcomes
+```sh
+python main.py --check
+```
 
-- Throughput target: configured around 20 FPS capture/write flow in local runs.
-- Detection responsiveness: near-immediate status update once consecutive low-EAR condition is met.
-- Usability: single-command startup, live on-screen indicator, and audible alert feedback.
+## Development and tests
 
-Current repository version does not include formal benchmark logs or accuracy metrics on a labeled dataset; adding benchmark scripts is listed in ROADMAP.md.
+Python decision logic (standard library only): `python -m unittest -v test_detector.py`.
 
-## Resume-Ready Project Highlights
+For the browser source, use Node 22.12+ / 24 and npm:
 
-- Built a real-time drowsiness detection pipeline using MediaPipe face landmarks, OpenCV, and EAR-based fatigue logic.
-- Implemented asynchronous inference and thresholded consecutive-frame decisioning to distinguish normal blinks from sustained eye closure.
-- Delivered an end-to-end safety-focused prototype with live UI overlay, alert mechanism, and modular Python design for extensibility.
+```sh
+npm ci
+npm test
+npm run build
+npm run preview
+```
 
-## Future Improvements
+Use the production build for the browser worker: MediaPipe's WASM loader needs a classic worker, which Vite bundles from the module source. The deployed site integrates the same demo under its project route. The root page's back link is intended for reiandraa.com.
 
-- Add calibration mode for user-specific EAR thresholds.
-- Add benchmark suite with precision/recall on labeled fatigue events.
-- Add cross-platform alerting for Linux and macOS.
-- Add lightweight UI layer for settings and sensitivity tuning.
-- Evaluate TensorFlow/Keras-based classifier as an alternative to rule-based detection.
+## Validation status
+
+The Python model and browser model are checked with a blank frame without opening a camera. Automated tests cover timing, missing faces, frame gaps, geometry, permission denial, late permission results, Stop, and resource cleanup. A live Mac camera trial is still required before claiming Mac camera validation.
 
 ## License
 
-MIT License. See LICENSE for details.
+MIT. Original copyright P SREESANKAR retained. Refinements by Reiandraa, 2026. MediaPipe, OpenCV and their model/dependencies retain their own terms and licenses; see SOURCES.md.

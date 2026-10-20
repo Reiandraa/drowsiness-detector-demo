@@ -1,103 +1,79 @@
-import time
-import cv2
-import mediapipe as mp
-import numpy as np
-import winsound
-import threading
+"""Eye-closure logic, adapted from P SREESANKAR's MIT MediaPipe demo.
 
-model_path = r'C:\Users\SREESANKAR\Dev\drowsiness-detection\face_landmarker.task'
+Uses pixel-correct EAR geometry with fresh, timestamped observations. Missing
+faces, invalid landmarks, or gaps reset evidence instead of reusing stale EAR.
+This is an educational heuristic, not a measurement of sleep or driving safety.
+"""
+from dataclasses import dataclass
+from math import hypot, isfinite
 
-#              P1   P2   P3   P4   P5   P6
-
-
-
-class DrowsinessDetector():
-        def __init__(self, camera):
-                self.ear_value = 0.0
-                self.LEFT_EYE  = [362, 385, 387, 263, 373, 380]
-                self.RIGHT_EYE = [33,  160, 158, 133, 153, 144]
-
-                self.frame_counter = 0
-                self.CONSEC_FRAMES = 20
-                self.DROWSY_THRESHOLD = 0.23
-
-                self.BaseOptions = mp.tasks.BaseOptions
-                self.FaceLandmarker = mp.tasks.vision.FaceLandmarker
-                self.FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
-                self.FaceLandmarkerResult = mp.tasks.vision.FaceLandmarkerResult
-                self.VisionRunningMode = mp.tasks.vision.RunningMode
-
-                self.alarm_on = False
-
-                self.camera = camera
-
-                self.options = self.FaceLandmarkerOptions(base_options=self.BaseOptions(model_asset_path=model_path),
-                                        running_mode=self.VisionRunningMode.LIVE_STREAM,
-                                        result_callback=self.print_result)
-                self.landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(self.options)
-        def get_ear(self, landmarks, eye_indices, w, h):
-                pts = [(landmarks[i].x * w, landmarks[i].y * h) for i in eye_indices]
-                # vertical
-                A = np.linalg.norm(np.array(pts[1]) - np.array(pts[5]))
-                B = np.linalg.norm(np.array(pts[2]) - np.array(pts[4]))
-                # horizontal
-                C = np.linalg.norm(np.array(pts[0]) - np.array(pts[3]))
-
-                return (A + B) / (2.0 * C)
-
-        def print_result(self, result, output_image, timestamp_ms):
-                if not result.face_landmarks:
-                        return
-                landmarks = result.face_landmarks[0]
-                left_ear  = self.get_ear(landmarks, self.LEFT_EYE,  self.camera.width, self.camera.height)
-                right_ear = self.get_ear(landmarks, self.RIGHT_EYE, self.camera.width, self.camera.height)
-                self.ear_value = (left_ear + right_ear) / 2.0
-        
-
-        def beep(self):
-                print("BEEP TRIGGERED")
-                winsound.PlaySound("SystemExclamation", winsound.SND_ALIAS)
-
-        def stop(self):
-                self.camera.release()
-                self.landmarker.close()
+LEFT_EYE = (362, 385, 387, 263, 373, 380)
+RIGHT_EYE = (33, 160, 158, 133, 153, 144)
 
 
-        def run(self):
-                while True:
-                        frame_timestamp_ms = int(time.perf_counter() * 1000)
-                        current_frame = self.camera.read()
-                        rgb_frame = cv2.cvtColor(current_frame, cv2.COLOR_BGR2RGB)
-                        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-                        self.landmarker.detect_async(mp_image, frame_timestamp_ms)
+def eye_ratio(landmarks, indices, width, height):
+    if not width or not height:
+        return None
+    try:
+        points = [(landmarks[i].x * width, landmarks[i].y * height) for i in indices]
+        if not all(isfinite(v) for p in points for v in p):
+            return None
+        distance = lambda a, b: hypot(a[0] - b[0], a[1] - b[1])
+        horizontal = distance(points[0], points[3])
+        if horizontal < 1:
+            return None
+        ratio = (distance(points[1], points[5]) + distance(points[2], points[4])) / (2 * horizontal)
+        return ratio if 0 <= ratio <= 1 else None
+    except (IndexError, TypeError, AttributeError):
+        return None
 
-                        if self.ear_value < self.DROWSY_THRESHOLD:
-                                self.frame_counter += 1
-                                print(self.frame_counter)
-                        else:
-                                self.frame_counter = 0
 
-                        if self.frame_counter >= self.CONSEC_FRAMES:
-                                label = "DROWSY"
-                                color = (0, 0, 255)
+@dataclass(frozen=True)
+class Observation:
+    status: str
+    closed_seconds: float = 0.0
+    ear: float | None = None
+    alerts: int = 0
+    blinks: int = 0
 
-                                if not self.alarm_on:
-                                        self.alarm_on = True
-                                        threading.Thread(target=self.beep, daemon=True).start()
 
-                        else:
-                                label = "Alert"
-                                color = (0, 255, 0)
-                                self.alarm_on = False
+class ClosureTracker:
+    def __init__(self, threshold=0.23, alert_after=1.5, max_gap=0.35):
+        if not 0 < threshold < 1 or alert_after <= 0 or max_gap <= 0:
+            raise ValueError('Invalid tracker settings')
+        self.threshold, self.alert_after, self.max_gap = threshold, alert_after, max_gap
+        self.reset()
 
-                        cv2.putText(current_frame, label, (15, 20),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 2)
-                        cv2.putText(current_frame, f"EAR: {self.ear_value:.2f}", (15, 40),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 2)
+    def reset(self):
+        self.last_time = self.closed_at = None
+        self.alerted = False
+        self.alerts = self.blinks = 0
 
-                        self.camera.write(current_frame)
-                        cv2.imshow('Camera', current_frame)
-
-                        if cv2.waitKey(1) == ord('q'):
-                                self.stop()
-                                break
+    def update(self, left, right, now):
+        if not isfinite(now):
+            raise ValueError('Timestamp must be finite')
+        gap = self.last_time is not None and (now < self.last_time or now - self.last_time > self.max_gap)
+        self.last_time = now
+        if gap:
+            self.closed_at = None
+            self.alerted = False
+        valid = all(v is not None and isfinite(v) and 0 <= v <= 1 for v in (left, right))
+        if not valid:
+            self.closed_at = None
+            self.alerted = False
+            return Observation('no-face', alerts=self.alerts, blinks=self.blinks)
+        ear = (left + right) / 2
+        if left < self.threshold and right < self.threshold:
+            if self.closed_at is None:
+                self.closed_at = now
+            duration = now - self.closed_at
+            if duration >= self.alert_after:
+                if not self.alerted:
+                    self.alerts += 1
+                self.alerted = True
+            return Observation('prolonged' if self.alerted else 'closed', duration, ear, self.alerts, self.blinks)
+        if self.closed_at is not None and 0.08 <= now - self.closed_at <= 0.7 and not self.alerted:
+            self.blinks += 1
+        self.closed_at = None
+        self.alerted = False
+        return Observation('open', ear=ear, alerts=self.alerts, blinks=self.blinks)

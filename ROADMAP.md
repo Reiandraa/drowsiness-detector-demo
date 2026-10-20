@@ -1,18 +1,7 @@
-# Roadmap
+# Next checks
 
-## Near Term
+- Owner's Apple Silicon Mac: browser and Python camera trials, including permission denial, Stop and restart, eye closure, glasses and lighting.
+- Evaluate calibration with consented, representative test data before claiming improved detection quality.
+- Keep this new demo separate from the original 2023 Android project's presentation.
 
-- Add configurable EAR threshold and frame window from command-line arguments.
-- Add simple event logging for drowsiness alerts (timestamp and duration).
-- Add cross-platform sound fallback for non-Windows systems.
-
-## Mid Term
-
-- Add evaluation script for labeled test clips (precision, recall, false alarm rate).
-- Add optional smoothing/filtering for EAR stability under noisy lighting.
-- Add lightweight UI controls for sensitivity and alert behavior.
-
-## Longer Term
-
-- Compare rule-based approach with TensorFlow/Keras classifier for fatigue states.
-- Add deployment packaging for easier desktop distribution.
+No accuracy claim or driving-safety validation is made.

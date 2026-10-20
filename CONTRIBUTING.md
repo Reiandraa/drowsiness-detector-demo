@@ -1,27 +1,5 @@
 # Contributing
 
-Thanks for your interest in improving this project.
+Run the Python and JavaScript tests described in Readme.md. Preserve upstream attribution and keep camera capture opt-in, local, and without recording. Test camera release on Stop, page exit, permission cancellation, and failure. Do not infer sleep or driving safety from the eye-closure heuristic.
 
-## How to Contribute
-
-1. Fork the repository.
-2. Create a feature branch with a clear name.
-3. Keep pull requests focused and small.
-4. Add or update documentation when behavior changes.
-5. Open a pull request with a concise summary and test notes.
-
-## Contribution Guidelines
-
-- Do not commit model binaries, videos, or generated artifacts.
-- Follow existing project style and file structure.
-- Describe performance or behavior impact for detection logic changes.
-- For bug fixes, include reproducible steps in the pull request.
-
-## Reporting Issues
-
-When opening an issue, include:
-
-- Operating system and Python version
-- Steps to reproduce
-- Expected result vs actual result
-- Logs or screenshots when helpful
+Camera validation on a new platform must be recorded honestly; automated model checks without a camera are not a substitute for a live-device trial.
